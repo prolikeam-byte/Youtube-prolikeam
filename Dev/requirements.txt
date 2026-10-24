@@ -1,0 +1,4 @@
+moviepy==2.2.1
+Pillow>=10.0.0
+pyttsx3>=2.90
+numpy>=1.26.0
