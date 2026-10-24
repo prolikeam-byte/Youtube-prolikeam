@@ -2,6 +2,9 @@
 name: Create YouTube Short
 
 on:
+  push:
+    branches:
+      - Development
   workflow_dispatch:
 
 permissions:
@@ -9,12 +12,16 @@ permissions:
 
 jobs:
   render-video:
+    # Prevent rendering from any branch except Development.
+    if: github.ref == 'refs/heads/Development'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Get project files
+      - name: Get Development branch files
         uses: actions/checkout@v4
+        with:
+          ref: Development
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,8 +41,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Generate video
-        run: |
-          python make_short.py
+        run: python make_short.py
 
       - name: Upload finished MP4
         uses: actions/upload-artifact@v4
