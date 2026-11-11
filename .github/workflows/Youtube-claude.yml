@@ -1,13 +1,13 @@
 name: Build and Render Video
-
 on:
-  workflow_dispatch:        # Runs only when manually triggered from the Actions tab
+  workflow_dispatch:
     inputs:
       work_dir:
         description: "Folder to run in ('.' for root, or 'Dev')"
         required: true
-        default: "."
+        default: "Dev"
         type: string
+
       output_file:
         description: "Output MP4 filename"
         required: true
