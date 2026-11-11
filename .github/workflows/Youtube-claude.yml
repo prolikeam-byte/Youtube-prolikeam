@@ -15,8 +15,8 @@ on:
         type: string
 
 env:
-  WORK_DIR: ${{ inputs.work_dir || 'Dev' }}
-  OUTPUT_FILE: ${{ inputs.output_file || 'out.mp4' }}
+  WORK_DIR: ${{ inputs.work_dir }}
+  OUTPUT_FILE: ${{ inputs.output_file }}
   HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
@@ -37,6 +37,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Install FFmpeg
         run: |
@@ -46,61 +47,57 @@ jobs:
       - name: Ensure working directory and assets exist
         run: |
           mkdir -p "${{ env.WORK_DIR }}/assets"
-          if [ -z "$(ls -A "${{ env.WORK_DIR }}/assets"/*.png 2>/dev/null)" ]; then
-            echo "No PNGs found in ${{ env.WORK_DIR }}/assets/. Generating 3 dummy vertical slides..."
-            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_01.png"
-            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_02.png"
-            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_03.png"
+
+          if ! compgen -G "${{ env.WORK_DIR }}/assets/*.png" > /dev/null; then
+            echo "No PNGs found. Generating placeholder slides..."
+
+            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 \
+              "${{ env.WORK_DIR }}/assets/scene_01.png"
+
+            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 \
+              "${{ env.WORK_DIR }}/assets/scene_02.png"
+
+            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 \
+              "${{ env.WORK_DIR }}/assets/scene_03.png"
           fi
 
       - name: Install Python dependencies
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ -f "requirements.txt" ]; then
+          if [ -f requirements.txt ]; then
             pip install -r requirements.txt
-          elif [ -f "../requirements.txt" ]; then
+          elif [ -f ../requirements.txt ]; then
             pip install -r ../requirements.txt
+          fi
+
+      - name: Install Node dependencies
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          if [ -f package.json ]; then
+            npm ci
           fi
 
       - name: Run make_short.py
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ -f "make_short.py" ]; then
+          if [ -f make_short.py ]; then
             python make_short.py
-          elif [ -f "assets/make_short.py" ]; then
+          elif [ -f assets/make_short.py ]; then
             python assets/make_short.py
-          elif [ -f "../make_short.py" ]; then
+          elif [ -f ../make_short.py ]; then
             python ../make_short.py
+          else
+            echo "No make_short.py found. Continuing..."
           fi
 
       - name: Ensure Hyperframes composition exists
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ ! -f "index.html" ]; then
-            echo "No index.html found. Initializing a starter Hyperframes composition..."
-            npx --yes hyperframes init /tmp/hf-starter --non-interactive --example=blank
-            cp -rn /tmp/hf-starter/. .
-            rm -rf /tmp/hf-starter
-          fi
+          if [ ! -f index.html ]; then
+            echo "No index.html found. Initialising starter composition..."
 
-      - name: Check Hyperframes environment
-        working-directory: ${{ env.WORK_DIR }}
-        run: npx --yes hyperframes doctor
+            npx --yes hyperframes init /tmp/hf-starter \
+              --non-interactive \
+              --example=blank
 
-      - name: Lint Hyperframes composition
-        working-directory: ${{ env.WORK_DIR }}
-        run: npx --yes hyperframes lint
-
-      - name: Render Hyperframes composition to MP4
-        working-directory: ${{ env.WORK_DIR }}
-        run: npx --yes hyperframes render --quality high --strict --output "$OUTPUT_FILE"
-
-      - name: Upload generated videos
-        uses: actions/upload-artifact@v4
-        with:
-          name: rendered-videos
-          path: |
-            ${{ env.WORK_DIR }}/*.mp4
-            ${{ env.WORK_DIR }}/output/*.mp4
-          if-no-files-found: warn
-          retention-days: 14
+            cp -
