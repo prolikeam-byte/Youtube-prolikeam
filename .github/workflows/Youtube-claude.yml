@@ -6,7 +6,7 @@ name: Render video
 on:
   workflow_dispatch:        # lets you run it manually from the Actions tab
   push:
-    branches: [main]
+    branches: [Development]
     paths-ignore:
       - "**.md"
 
