@@ -25,40 +25,34 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Set up Node.js 22
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
 
       - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Ensure working directory and assets exist
+      - name: Create assets folder if missing
         run: |
           mkdir -p "${{ env.WORK_DIR }}/assets"
 
+      - name: Create placeholder images if none exist
+        run: |
           if ! compgen -G "${{ env.WORK_DIR }}/assets/*.png" > /dev/null; then
-            echo "No PNGs found. Generating placeholder slides..."
-
-            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 \
-              "${{ env.WORK_DIR }}/assets/scene_01.png"
-
-            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 \
-              "${{ env.WORK_DIR }}/assets/scene_02.png"
-
-            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 \
-              "${{ env.WORK_DIR }}/assets/scene_03.png"
+            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_01.png"
+            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_02.png"
+            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_03.png"
           fi
 
       - name: Install Python dependencies
@@ -66,15 +60,13 @@ jobs:
         run: |
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
-          elif [ -f ../requirements.txt ]; then
-            pip install -r ../requirements.txt
           fi
 
       - name: Install Node dependencies
         working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f package.json ]; then
-            npm ci
+            npm install
           fi
 
       - name: Run make_short.py
@@ -82,22 +74,22 @@ jobs:
         run: |
           if [ -f make_short.py ]; then
             python make_short.py
-          elif [ -f assets/make_short.py ]; then
-            python assets/make_short.py
-          elif [ -f ../make_short.py ]; then
-            python ../make_short.py
           else
-            echo "No make_short.py found. Continuing..."
+            echo "make_short.py not found"
           fi
 
-      - name: Ensure Hyperframes composition exists
+      - name: Verify project files
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ ! -f index.html ]; then
-            echo "No index.html found. Initialising starter composition..."
+          pwd
+          ls -la
 
-            npx --yes hyperframes init /tmp/hf-starter \
-              --non-interactive \
-              --example=blank
+      - name: Render video
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          npx --yes hyperframes render \
+            --quality high \
+            --output "${{ env.OUTPUT_FILE }}"
 
-            cp -
+      - name: Upload video
+        uses: actions/upload-artifact
