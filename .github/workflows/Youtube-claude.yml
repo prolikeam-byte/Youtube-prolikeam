@@ -2,22 +2,6 @@ name: Build and Render Video
 
 on:
   workflow_dispatch:
-    inputs:
-      work_dir:
-        description: "Folder to run in ('.' for root, or 'Dev')"
-        required: true
-        default: "Dev"
-        type: string
-      output_file:
-        description: "Output MP4 filename"
-        required: true
-        default: "out.mp4"
-        type: string
-
-env:
-  WORK_DIR: ${{ inputs.work_dir }}
-  OUTPUT_FILE: ${{ inputs.output_file }}
-  HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
   build-and-render:
@@ -43,34 +27,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Create assets folder if missing
+      - name: Show repository files
         run: |
-          mkdir -p "${{ env.WORK_DIR }}/assets"
+          pwd
+          find . -type f | sort
 
-      - name: Create placeholder images if none exist
-        run: |
-          if ! compgen -G "${{ env.WORK_DIR }}/assets/*.png" > /dev/null; then
-            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_01.png"
-            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_02.png"
-            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_03.png"
-          fi
-
-      - name: Install Python dependencies
-        working-directory: ${{ env.WORK_DIR }}
+      - name: Install Python requirements
         run: |
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
 
       - name: Install Node dependencies
-        working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f package.json ]; then
             npm install
           fi
 
       - name: Run make_short.py
-        working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f make_short.py ]; then
             python make_short.py
@@ -78,18 +52,11 @@ jobs:
             echo "make_short.py not found"
           fi
 
-      - name: Verify project files
-        working-directory: ${{ env.WORK_DIR }}
-        run: |
-          pwd
-          ls -la
-
-      - name: Render video
-        working-directory: ${{ env.WORK_DIR }}
-        run: |
-          npx --yes hyperframes render \
-            --quality high \
-            --output "${{ env.OUTPUT_FILE }}"
-
-      - name: Upload video
-        uses: actions/upload-artifact
+      - name: Upload MP4 files
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos
+          path: |
+            *.mp4
+            output/*.mp4
+          if-no-files-found: warn
