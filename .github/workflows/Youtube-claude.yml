@@ -1,5 +1,5 @@
 # Save as: .github/workflows/render-video.yml
-# Renders a Hyperframes project to MP4 on demand via GitHub Actions and uploads it as a downloadable artifact.
+# Runs make_short.py, renders the Hyperframes project to MP4 on demand, and uploads it as an artifact.
 
 name: Render video
 
@@ -31,6 +31,11 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -40,6 +45,28 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies (if requirements.txt exists)
+        run: |
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Create dummy scene images if assets folder is empty
+        run: |
+          mkdir -p assets
+          if [ -z "$(ls -A assets/*.png 2>/dev/null)" ]; then
+            echo "No PNGs found in assets/. Generating 3 dummy vertical slides..."
+            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 assets/scene_01.png
+            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 assets/scene_02.png
+            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 assets/scene_03.png
+          fi
+
+      - name: Build short composition with Python
+        run: |
+          if [ -f "make_short.py" ]; then
+            python make_short.py
+          fi
 
       - name: Ensure Hyperframes composition exists
         working-directory: ${{ env.VIDEO_DIR }}
