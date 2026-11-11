@@ -12,9 +12,10 @@ on:
 
 env:
   # Folder that contains your Hyperframes project (the one with index.html).
-  # Use "." if the project is at the repo root.
+  # Use "." if the project is at the repo root, or e.g. "./my-video" for a subfolder.
   VIDEO_DIR: "."
   OUTPUT_FILE: "out.mp4"
+  HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
   render:
@@ -28,12 +29,20 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg & headless browser dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+
+      - name: Ensure Hyperframes composition exists
+        working-directory: ${{ env.VIDEO_DIR }}
+        run: |
+          if [ ! -f "index.html" ]; then
+            echo "No index.html found. Initializing a starter Hyperframes composition..."
+            npx --yes hyperframes init . --non-interactive --example=blank
+          fi
 
       - name: Check environment
         working-directory: ${{ env.VIDEO_DIR }}
