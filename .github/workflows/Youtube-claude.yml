@@ -1,4 +1,5 @@
 name: Build and Render Video
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +8,6 @@ on:
         required: true
         default: "Dev"
         type: string
-
       output_file:
         description: "Output MP4 filename"
         required: true
@@ -15,8 +15,8 @@ on:
         type: string
 
 env:
-  WORK_DIR: ${{ inputs.work_dir }}
-  OUTPUT_FILE: ${{ inputs.output_file }}
+  WORK_DIR: ${{ inputs.work_dir || 'Dev' }}
+  OUTPUT_FILE: ${{ inputs.output_file || 'out.mp4' }}
   HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
@@ -43,6 +43,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: Ensure working directory and assets exist
+        run: |
+          mkdir -p "${{ env.WORK_DIR }}/assets"
+          if [ -z "$(ls -A "${{ env.WORK_DIR }}/assets"/*.png 2>/dev/null)" ]; then
+            echo "No PNGs found in ${{ env.WORK_DIR }}/assets/. Generating 3 dummy vertical slides..."
+            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_01.png"
+            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_02.png"
+            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "${{ env.WORK_DIR }}/assets/scene_03.png"
+          fi
+
       - name: Install Python dependencies
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -52,25 +62,15 @@ jobs:
             pip install -r ../requirements.txt
           fi
 
-      - name: Create dummy scene images if assets folders are empty
-        run: |
-          for dir in "." "Dev"; do
-            if [ -d "$dir" ]; then
-              mkdir -p "$dir/assets"
-              if [ -z "$(ls -A "$dir/assets"/*.png 2>/dev/null)" ]; then
-                echo "No PNGs found in $dir/assets/. Generating 3 dummy vertical slides..."
-                ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "$dir/assets/scene_01.png"
-                ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "$dir/assets/scene_02.png"
-                ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "$dir/assets/scene_03.png"
-              fi
-            fi
-          done
-
       - name: Run make_short.py
         working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f "make_short.py" ]; then
             python make_short.py
+          elif [ -f "assets/make_short.py" ]; then
+            python assets/make_short.py
+          elif [ -f "../make_short.py" ]; then
+            python ../make_short.py
           fi
 
       - name: Ensure Hyperframes composition exists
