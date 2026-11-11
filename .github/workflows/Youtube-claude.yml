@@ -1,20 +1,25 @@
 # Save as: .github/workflows/render-video.yml
-# Renders a Hyperframes project to MP4 on GitHub Actions and uploads it as a downloadable artifact.
+# Renders a Hyperframes project to MP4 on demand via GitHub Actions and uploads it as a downloadable artifact.
 
 name: Render video
 
 on:
-  workflow_dispatch:        # lets you run it manually from the Actions tab
-  push:
-    branches: [Development]
-    paths-ignore:
-      - "**.md"
+  workflow_dispatch:        # Runs only when manually triggered from the Actions tab
+    inputs:
+      video_dir:
+        description: "Folder containing index.html (use '.' for repo root)"
+        required: true
+        default: "."
+        type: string
+      output_file:
+        description: "Output MP4 filename"
+        required: true
+        default: "out.mp4"
+        type: string
 
 env:
-  # Folder that contains your Hyperframes project (the one with index.html).
-  # Use "." if the project is at the repo root, or e.g. "./my-video" for a subfolder.
-  VIDEO_DIR: "."
-  OUTPUT_FILE: "out.mp4"
+  VIDEO_DIR: ${{ inputs.video_dir }}
+  OUTPUT_FILE: ${{ inputs.output_file }}
   HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
@@ -31,7 +36,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install FFmpeg & headless browser dependencies
+      - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
@@ -39,9 +44,12 @@ jobs:
       - name: Ensure Hyperframes composition exists
         working-directory: ${{ env.VIDEO_DIR }}
         run: |
+          mkdir -p .
           if [ ! -f "index.html" ]; then
             echo "No index.html found. Initializing a starter Hyperframes composition..."
-            npx --yes hyperframes init . --non-interactive --example=blank
+            npx --yes hyperframes init /tmp/hf-starter --non-interactive --example=blank
+            cp -rn /tmp/hf-starter/. .
+            rm -rf /tmp/hf-starter
           fi
 
       - name: Check environment
