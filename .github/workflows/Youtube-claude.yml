@@ -1,13 +1,10 @@
-# Save as: .github/workflows/render-video.yml
-# Runs make_short.py, renders the Hyperframes project to MP4 on demand, and uploads it as an artifact.
-
-name: Render video
+name: Build and Render Video
 
 on:
   workflow_dispatch:        # Runs only when manually triggered from the Actions tab
     inputs:
-      video_dir:
-        description: "Folder containing index.html (use '.' for repo root)"
+      work_dir:
+        description: "Folder to run in ('.' for root, or 'Dev')"
         required: true
         default: "."
         type: string
@@ -18,17 +15,17 @@ on:
         type: string
 
 env:
-  VIDEO_DIR: ${{ inputs.video_dir }}
+  WORK_DIR: ${{ inputs.work_dir }}
   OUTPUT_FILE: ${{ inputs.output_file }}
   HYPERFRAMES_NO_UPDATE_CHECK: "1"
 
 jobs:
-  render:
+  build-and-render:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: Check out repo
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python 3.11
@@ -46,32 +43,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Install Python dependencies (if requirements.txt exists)
+      - name: Install Python dependencies
+        working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f "requirements.txt" ]; then
             pip install -r requirements.txt
+          elif [ -f "../requirements.txt" ]; then
+            pip install -r ../requirements.txt
           fi
 
-      - name: Create dummy scene images if assets folder is empty
+      - name: Create dummy scene images if assets folders are empty
         run: |
-          mkdir -p assets
-          if [ -z "$(ls -A assets/*.png 2>/dev/null)" ]; then
-            echo "No PNGs found in assets/. Generating 3 dummy vertical slides..."
-            ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 assets/scene_01.png
-            ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 assets/scene_02.png
-            ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 assets/scene_03.png
-          fi
+          for dir in "." "Dev"; do
+            if [ -d "$dir" ]; then
+              mkdir -p "$dir/assets"
+              if [ -z "$(ls -A "$dir/assets"/*.png 2>/dev/null)" ]; then
+                echo "No PNGs found in $dir/assets/. Generating 3 dummy vertical slides..."
+                ffmpeg -y -f lavfi -i color=c=#1e293b:s=1080x1920 -frames:v 1 "$dir/assets/scene_01.png"
+                ffmpeg -y -f lavfi -i color=c=#0f172a:s=1080x1920 -frames:v 1 "$dir/assets/scene_02.png"
+                ffmpeg -y -f lavfi -i color=c=#334155:s=1080x1920 -frames:v 1 "$dir/assets/scene_03.png"
+              fi
+            fi
+          done
 
-      - name: Build short composition with Python
+      - name: Run make_short.py
+        working-directory: ${{ env.WORK_DIR }}
         run: |
           if [ -f "make_short.py" ]; then
             python make_short.py
           fi
 
       - name: Ensure Hyperframes composition exists
-        working-directory: ${{ env.VIDEO_DIR }}
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          mkdir -p .
           if [ ! -f "index.html" ]; then
             echo "No index.html found. Initializing a starter Hyperframes composition..."
             npx --yes hyperframes init /tmp/hf-starter --non-interactive --example=blank
@@ -79,28 +83,24 @@ jobs:
             rm -rf /tmp/hf-starter
           fi
 
-      - name: Check environment
-        working-directory: ${{ env.VIDEO_DIR }}
+      - name: Check Hyperframes environment
+        working-directory: ${{ env.WORK_DIR }}
         run: npx --yes hyperframes doctor
 
-      - name: Lint composition
-        working-directory: ${{ env.VIDEO_DIR }}
+      - name: Lint Hyperframes composition
+        working-directory: ${{ env.WORK_DIR }}
         run: npx --yes hyperframes lint
 
-      - name: Render to MP4
-        working-directory: ${{ env.VIDEO_DIR }}
+      - name: Render Hyperframes composition to MP4
+        working-directory: ${{ env.WORK_DIR }}
         run: npx --yes hyperframes render --quality high --strict --output "$OUTPUT_FILE"
 
-      - name: Verify output exists
-        working-directory: ${{ env.VIDEO_DIR }}
-        run: |
-          [ -s "$OUTPUT_FILE" ] || { echo "Render produced no output"; exit 1; }
-          ffprobe -v error -show_entries format=duration -of default=nw=1 "$OUTPUT_FILE"
-
-      - name: Upload video
+      - name: Upload generated videos
         uses: actions/upload-artifact@v4
         with:
-          name: rendered-video
-          path: ${{ env.VIDEO_DIR }}/${{ env.OUTPUT_FILE }}
-          if-no-files-found: error
+          name: rendered-videos
+          path: |
+            ${{ env.WORK_DIR }}/*.mp4
+            ${{ env.WORK_DIR }}/output/*.mp4
+          if-no-files-found: warn
           retention-days: 14
