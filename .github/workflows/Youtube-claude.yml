@@ -1,0 +1,62 @@
+# Save as: .github/workflows/render-video.yml
+# Renders a Hyperframes project to MP4 on GitHub Actions and uploads it as a downloadable artifact.
+
+name: Render video
+
+on:
+  workflow_dispatch:        # lets you run it manually from the Actions tab
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+
+env:
+  # Folder that contains your Hyperframes project (the one with index.html).
+  # Use "." if the project is at the repo root.
+  VIDEO_DIR: "."
+  OUTPUT_FILE: "out.mp4"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Check environment
+        working-directory: ${{ env.VIDEO_DIR }}
+        run: npx --yes hyperframes doctor
+
+      - name: Lint composition
+        working-directory: ${{ env.VIDEO_DIR }}
+        run: npx --yes hyperframes lint
+
+      - name: Render to MP4
+        working-directory: ${{ env.VIDEO_DIR }}
+        run: npx --yes hyperframes render --quality high --strict --output "$OUTPUT_FILE"
+
+      - name: Verify output exists
+        working-directory: ${{ env.VIDEO_DIR }}
+        run: |
+          [ -s "$OUTPUT_FILE" ] || { echo "Render produced no output"; exit 1; }
+          ffprobe -v error -show_entries format=duration -of default=nw=1 "$OUTPUT_FILE"
+
+      - name: Upload video
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-video
+          path: ${{ env.VIDEO_DIR }}/${{ env.OUTPUT_FILE }}
+          if-no-files-found: error
+          retention-days: 14
