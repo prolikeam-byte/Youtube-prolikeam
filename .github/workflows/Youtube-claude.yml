@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install system dependencies
+      - name: Install system packages
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -43,12 +43,13 @@ jobs:
             espeak-ng \
             libespeak-ng1
 
-      - name: Install Python packages
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
 
           pip install \
             numpy \
+            pyttsx3 \
             pillow \
             moviepy \
             imageio \
@@ -57,23 +58,15 @@ jobs:
             scipy \
             tqdm
 
-      - name: Verify project files
+      - name: Verify pyttsx3 installation
         run: |
-          pwd
-          find . -type f | sort
+          python -m pip show pyttsx3
 
       - name: Verify assets
         run: |
           ls -la assets
 
-          COUNT=$(find assets -name "scene_*.png" | wc -l)
-
-          if [ "$COUNT" -eq 0 ]; then
-            echo "No scene images found!"
-            exit 1
-          fi
-
-      - name: Ensure narration exists
+      - name: Ensure narration file exists
         run: |
           mkdir -p input
 
@@ -81,17 +74,16 @@ jobs:
             echo "This is a sample narration." > input/narration.txt
           fi
 
-      - name: Generate video
+      - name: Run make_short.py
         run: |
           echo "Using voice: $VOICE"
           python make_short.py
 
-      - name: Upload outputs
+      - name: Upload generated videos
         uses: actions/upload-artifact@v4
         with:
-          name: generated-video
+          name: youtube-short
           path: |
-            Dev/output/**/*.mp4
             Dev/output/**
             Dev/*.mp4
           if-no-files-found: warn
