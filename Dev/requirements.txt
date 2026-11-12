@@ -1,4 +1,9 @@
-moviepy==2.2.1
-Pillow>=10.0.0
-pyttsx3>=2.90
-numpy>=1.26.0
+numpy
+pyttsx3
+pillow
+moviepy
+imageio
+imageio-ffmpeg
+pydub
+scipy
+tqdm
