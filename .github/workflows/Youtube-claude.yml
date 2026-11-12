@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       voice:
-        description: "eSpeak voice"
+        description: "Voice name"
         required: true
-        default: "en+f3"
+        default: "en-IN-PrabhatNeural"
 
 jobs:
   create-short:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     defaults:
       run:
@@ -20,18 +21,78 @@ jobs:
       VOICE: ${{ inputs.voice }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg espeak-ng
+          sudo apt-get install -y \
+            ffmpeg \
+            espeak \
+            espeak-ng \
+            libespeak-ng1
 
-      - name: Run make_short.py
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+
+          pip install \
+            numpy \
+            pillow \
+            moviepy \
+            imageio \
+            imageio-ffmpeg \
+            pydub \
+            scipy \
+            tqdm
+
+      - name: Verify project files
+        run: |
+          pwd
+          find . -type f | sort
+
+      - name: Verify assets
+        run: |
+          ls -la assets
+
+          COUNT=$(find assets -name "scene_*.png" | wc -l)
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No scene images found!"
+            exit 1
+          fi
+
+      - name: Ensure narration exists
+        run: |
+          mkdir -p input
+
+          if [ ! -f input/narration.txt ]; then
+            echo "This is a sample narration." > input/narration.txt
+          fi
+
+      - name: Generate video
         run: |
           echo "Using voice: $VOICE"
           python make_short.py
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-video
+          path: |
+            Dev/output/**/*.mp4
+            Dev/output/**
+            Dev/*.mp4
+          if-no-files-found: warn
+          retention-days: 14
