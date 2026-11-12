@@ -2,86 +2,36 @@ name: Create YouTube Short
 
 on:
   workflow_dispatch:
+    inputs:
+      voice:
+        description: "eSpeak voice"
+        required: true
+        default: "en+f3"
 
 jobs:
   create-short:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     defaults:
       run:
         working-directory: Dev
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    env:
+      VOICE: ${{ inputs.voice }}
 
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install FFmpeg and eSpeak-NG
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            ffmpeg \
-            espeak-ng \
-            espeak \
-            libespeak-ng1
-
-      - name: Show project structure
-        run: |
-          pwd
-          find . -type f | sort
-
-      - name: Verify scene images
-        run: |
-          ls -la assets
-
-          COUNT=$(find assets -name "scene_*.png" | wc -l)
-
-          echo "Found $COUNT scene images"
-
-          if [ "$COUNT" -eq 0 ]; then
-            echo "No scene images found!"
-            exit 1
-          fi
-
-      - name: Ensure narration file exists
-        run: |
-          mkdir -p input
-
-          if [ ! -f input/narration.txt ]; then
-            echo "This is a test narration." > input/narration.txt
-          fi
-
-      - name: Install Python requirements
-        run: |
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
+          sudo apt-get install -y ffmpeg espeak-ng
 
       - name: Run make_short.py
         run: |
+          echo "Using voice: $VOICE"
           python make_short.py
-
-      - name: List generated files
-        run: |
-          find output -type f || true
-          find . -name "*.mp4" || true
-
-      - name: Upload generated videos
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-short
-          path: |
-            Dev/output/**
-            Dev/*.mp4
-          if-no-files-found: warn
-          retention-days: 14
