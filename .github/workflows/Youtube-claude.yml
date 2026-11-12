@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -26,42 +26,42 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and eSpeak-NG
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y \
+            ffmpeg \
+            espeak-ng \
+            espeak \
+            libespeak-ng1
 
       - name: Show project structure
         run: |
-          echo "Current directory:"
           pwd
-
-          echo "Files:"
           find . -type f | sort
 
-      - name: Verify assets
+      - name: Verify scene images
         run: |
-          echo "Assets folder contents:"
           ls -la assets
 
-          PNG_COUNT=$(find assets -name "scene_*.png" | wc -l)
+          COUNT=$(find assets -name "scene_*.png" | wc -l)
 
-          echo "Found $PNG_COUNT scene images"
+          echo "Found $COUNT scene images"
 
-          if [ "$PNG_COUNT" -eq 0 ]; then
-            echo "ERROR: No scene images found"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No scene images found!"
             exit 1
           fi
 
-      - name: Verify narration
+      - name: Ensure narration file exists
         run: |
           mkdir -p input
 
           if [ ! -f input/narration.txt ]; then
-            echo "Placeholder narration for testing." > input/narration.txt
+            echo "This is a test narration." > input/narration.txt
           fi
 
-      - name: Install Python dependencies
+      - name: Install Python requirements
         run: |
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
@@ -71,7 +71,12 @@ jobs:
         run: |
           python make_short.py
 
-      - name: Upload output files
+      - name: List generated files
+        run: |
+          find output -type f || true
+          find . -name "*.mp4" || true
+
+      - name: Upload generated videos
         uses: actions/upload-artifact@v4
         with:
           name: youtube-short
@@ -79,3 +84,4 @@ jobs:
             Dev/output/**
             Dev/*.mp4
           if-no-files-found: warn
+          retention-days: 14
